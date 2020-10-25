@@ -23,13 +23,13 @@ from collections import Counter
 # ftp://ftp.ncbi.nih.gov/blast/matrices/
 import nwalign3 as nw
 
-__author__ = "Your Name"
+__author__ = "Thibault Dugauquier"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Thibault Dugauquier"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Thibault Dugauquier"
+__email__ = "thibault.dug@gmail.com"
 __status__ = "Developpement"
 
 
@@ -69,6 +69,44 @@ def get_arguments():
                         default="OTU.fasta", help="Output file")
     return parser.parse_args()
 
+def read_fasta(amplicon_file, minseqlen):
+    if amplicon_file.endswith(".gz"):
+        file_in = gzip.open(amplicon_file)
+        seq = b""
+        for ligne in file_in:
+            if ligne.startswith(b">"):
+                if len(seq) >= minseqlen:
+                    yield seq.decode('ascii')
+                seq = b""
+            else:
+                seq += ligne[:-1]
+        yield seq.decode('ascii')
+    else:
+        file_in = open(amplicon_file)
+        seq = ""
+        for ligne in file_in:
+            if ligne.startswith(">"):
+                if len(seq) >= minseqlen:
+                    yield seq
+                seq = ""
+            else:
+                seq += ligne[:-1]
+        yield seq
+    file_in.close()
+
+def dereplication_fulllength(amplicon_file, minseqlen, mincount):
+    seq_dict = {}
+    for seq in list(read_fasta(amplicon_file, minseqlen)):
+        print(seq)
+        if seq in seq_dict:
+            seq_dict[seq] += 1
+        else:
+            seq_dict[seq] = 1
+    for seq, seq_count in sorted(seq_dict.items(), key = lambda item: item[1], reverse = True):
+        if seq_dict[seq] >= mincount:
+            yield [seq, seq_dict[seq]]
+    
+
 #==============================================================
 # Main program
 #==============================================================
@@ -78,6 +116,9 @@ def main():
     """
     # Get arguments
     args = get_arguments()
+    
+    seq = dereplication_fulllength(args.amplicon_file, args.minseqlen, args.mincount)
+    print(list(seq))
 
 
 if __name__ == '__main__':
